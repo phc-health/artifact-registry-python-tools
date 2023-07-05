@@ -39,6 +39,13 @@ class GooglePythonAuth(backend.KeyringBackend):
     if url.hostname is None or not url.hostname.endswith(".pkg.dev"):
       return
 
+    # try to load from env
+    try:
+      credentials = get_token_from_path()
+      return credentials
+    except Exception as e:
+      logging.warning("Failed to retrieve credentials from path: {0}".format(e))
+
     #trying application default credentials otherwise fall back to gcloud credentials command
     try:
       CREDENTIAL_SCOPES =["https://www.googleapis.com/auth/cloud-platform"]
@@ -86,3 +93,23 @@ def get_gcloud_credential():
     raise Exception("Malformed response from gcloud")
   return credential.get("access_token")
 
+
+def get_token_from_path():
+  import os
+  logging.warning("Trying to retrieve credentials from env path...")
+  access_token_path = os.getenv('GOOGLE_ACCESS_TOKEN_PATH')
+  if access_token_path is None:
+    raise Exception("No value found in GOOGLE_ACCESS_TOKEN_PATH env var")
+
+  logging.warning("Env var GOOGLE_ACCESS_TOKEN_PATH is set to {0}".format(access_token_path))
+  from pathlib import Path
+  token_path = Path(access_token_path)
+  if not token_path.exists():
+    raise Exception("File {0} in GOOGLE_ACCESS_TOKEN_PATH env var does not exist".format(token_path))
+
+  token_text = token_path.read_text().splitlines()
+  logging.warning("GOOGLE_ACCESS_TOKEN_PATH {0} exists...".format(token_path))
+  if len(token_text) > 0:
+    logging.warning("GOOGLE_ACCESS_TOKEN_PATH {0} contained data...".format(token_path))
+    return token_text[0]
+  raise Exception("File {0} in GOOGLE_ACCESS_TOKEN_PATH env var is empty".format(token_path))
